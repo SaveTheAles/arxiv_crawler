@@ -1,22 +1,28 @@
-from scrapper import *
-from tx_generator import *
+from helper import *
 from config import *
 import arxiv
-import json
-from progressbar import Bar, ETA, FileTransferSpeed, Percentage, ProgressBar
 
-widgets = ['Progress: ', Percentage(), ' ',
-               Bar(marker='-',left='[',right=']'),
-               ' ', ETA(), ' ', FileTransferSpeed()]
-pbar = ProgressBar(widgets=widgets, maxval=500)
+results = arxiv.query(query=QUERY, max_chunk_results=100, iterative=True)
 
-results = arxiv.query(query=QUERY, max_chunk_results=10, iterative=True)
+account = {
+    "address": ADDRESS,
+    "account_number": str(getAccountNumber(ADDRESS)),
+    "public_key": getPubKey(ADDRESS),
+    "sequence": getSequence(ADDRESS)
+}
 
-print('Collecting articles by', QUERY, 'keyword and generating transactions for broadcasting.')
+print('Signing and broadcasting txs by', QUERY, 'keyword ')
 i = 0
-for result in pbar(results()):
-    df = create_clinks_set(result, DATA_PATH)
-    tx = tx_generator(df, 'quantum computing article')
-    with open(TXS_PATH + '/link_tx{}.json'.format(i), 'w') as outfile:
-        json.dump(tx, outfile)
-    i+=1
+for result in results():
+    print('Try to create cyberlink set for tx #{}'.format(i))
+    df = createClinksSet(ADDRESS, result)
+    if df.empty:
+       pass
+    else:
+        sequence = getSequence(ADDRESS)
+        tx_generator(df, i, account)
+        sign(i, account)
+        broadcast(i)
+        account['sequence'] += 1
+    i += 1
+
